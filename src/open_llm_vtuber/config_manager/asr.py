@@ -165,6 +165,7 @@ class GroqWhisperASRConfig(I18nMixin):
     api_key: str = Field(..., alias="api_key")
     model: str = Field("whisper-large-v3-turbo", alias="model")
     lang: Optional[str] = Field(None, alias="lang")
+    base_url: Optional[str] = Field(None, alias="base_url")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "api_key": Description(

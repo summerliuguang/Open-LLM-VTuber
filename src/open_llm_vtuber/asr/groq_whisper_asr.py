@@ -10,10 +10,15 @@ class VoiceRecognition(ASRInterface):
     # sample_rate, n_channels, and sampwidth are defined in asr_interface.py
 
     def __init__(
-        self, api_key: str, model: str = "distil-whisper-large-v3-en", lang: str = "en"
+        self, api_key: str, model: str = "distil-whisper-large-v3-en", lang: str = "en",
+        base_url: str = None,
     ) -> None:
         logger.info("Initializing Groq ASR...")
-        self.client = Groq(api_key=api_key)
+        client_kwargs = {"api_key": api_key}
+        if base_url:
+            # 兼容 OpenAI 协议的自建端点(如 LiteGate 网关的音频转写桥接)
+            client_kwargs["base_url"] = base_url
+        self.client = Groq(**client_kwargs)
         self.lang = lang
         self.model = model
 
