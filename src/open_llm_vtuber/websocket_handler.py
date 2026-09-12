@@ -172,8 +172,7 @@ class WebSocketHandler:
         # Send initial group status
         await self.send_group_update(websocket, client_uid)
 
-        # Start microphone
-        await websocket.send_text(json.dumps({"type": "control", "text": "start-mic"}))
+        # 麦克风改为用户在界面手动开启,不再连接即自动启动
 
     async def _init_service_context(
         self, send_text: Callable, client_uid: str
