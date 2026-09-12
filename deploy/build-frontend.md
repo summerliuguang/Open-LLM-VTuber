@@ -19,6 +19,31 @@
 cd ~/web-projects/Open-LLM-VTuber-Web
 npm install --ignore-scripts --registry=https://registry.npmmirror.com   # 首次
 npm run build:web                       # 输出到 dist/web
-rsync -a dist/web/ ~/web-projects/Open-LLM-VTuber/frontend/ --exclude=.git
+rsync -a --delete dist/web/ ~/web-projects/Open-LLM-VTuber/frontend/    # --delete 清掉旧 hash 产物
 ```
 无需重启后端(静态文件即时生效);浏览器强刷(Ctrl+Shift+R)。
+
+## 更新 fork 的 build 分支(子模块指针指向它)
+
+build 分支的树 = dist/web 内容放在**仓库根**(assets/index.html/libs/favicon.ico)。
+用临时 worktree 更新(不要用 GIT_INDEX_FILE+git add -A 的偷懒法:dist 被 gitignore,
+-ADD 会把整个源码树加进去,或路径多一层 dist/ 前缀):
+
+```bash
+cd ~/web-projects/Open-LLM-VTuber-Web
+git worktree add --detach /tmp/ollvt-build-wt origin/build
+find /tmp/ollvt-build-wt -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+cp -r dist/web/. /tmp/ollvt-build-wt/
+cd /tmp/ollvt-build-wt && git add -A && git commit -m "构建:<说明>(源码 <main 分支 sha>)"
+git push origin HEAD:refs/heads/build --force
+cd ~/web-projects/Open-LLM-VTuber-Web && git worktree remove --force /tmp/ollvt-build-wt
+```
+
+主仓库(frontend 是 gitlink 指针,frontend/ 目录本身未初始化 .git)更新指针:
+
+```bash
+cd ~/web-projects/Open-LLM-VTuber
+git update-index --cacheinfo 160000 $(git --git-dir=$HOME/web-projects/Open-LLM-VTuber-Web/.git rev-parse origin/build) frontend
+git commit -m "前端子模块指针更新到 <构建说明>"
+git push origin main
+```
