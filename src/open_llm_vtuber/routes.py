@@ -3,7 +3,7 @@ import json
 from uuid import uuid4
 import numpy as np
 from datetime import datetime
-from fastapi import APIRouter, WebSocket, UploadFile, File, Response
+from fastapi import APIRouter, WebSocket, UploadFile, File, Request, Response
 from starlette.responses import JSONResponse
 from starlette.websockets import WebSocketDisconnect
 from loguru import logger
@@ -41,6 +41,64 @@ def init_client_ws_route(default_context_cache: ServiceContext) -> APIRouter:
             logger.error(f"Error in WebSocket connection: {e}")
             await ws_handler.handle_disconnect(client_uid)
             raise
+
+    @router.get("/api/llm-config")
+    async def get_llm_config():
+        """读取 conf.yaml 中当前使用的语言模型配置（api_key 脱敏）"""
+        import yaml
+
+        try:
+            with open("conf.yaml", "r", encoding="utf-8") as f:
+                conf = yaml.safe_load(f)
+            agent_conf = conf["character_config"]["agent_config"]
+            provider = agent_conf.get("llm_provider", "openai_compatible_llm")
+            llm_settings = agent_conf.get("llm_configs", {})
+            section = llm_settings.get(provider, {}) or {}
+            api_key = str(section.get("llm_api_key") or "")
+            masked = (api_key[:6] + "..." + api_key[-4:]) if len(api_key) > 12 else ("已设置" if api_key else "")
+            return JSONResponse(
+                {
+                    "provider": provider,
+                    "base_url": section.get("base_url", ""),
+                    "model": section.get("model", ""),
+                    "api_key_masked": masked,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to read LLM config: {e}")
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+    @router.post("/api/llm-config")
+    async def update_llm_config(request: Request):
+        """修改 conf.yaml 中语言模型配置；对新连接生效（页面刷新/重连后加载）"""
+        import yaml
+        from pydantic import BaseModel
+
+        class LlmConfigBody(BaseModel):
+            provider: str = "openai_compatible_llm"
+            base_url: str
+            api_key: str = ""  # 留空或与脱敏值相同表示不修改
+            model: str
+
+        body = LlmConfigBody(**(await request.json()))
+        try:
+            with open("conf.yaml", "r", encoding="utf-8") as f:
+                conf = yaml.safe_load(f)
+            agent_conf = conf["character_config"]["agent_config"]
+            agent_conf["llm_provider"] = body.provider
+            llm_settings = agent_conf.setdefault("llm_configs", {})
+            section = llm_settings.setdefault(body.provider, {})
+            section["base_url"] = body.base_url
+            if body.api_key and "..." not in body.api_key:
+                section["llm_api_key"] = body.api_key
+            section["model"] = body.model
+            with open("conf.yaml", "w", encoding="utf-8") as f:
+                yaml.safe_dump(conf, f, allow_unicode=True, sort_keys=False)
+            logger.info(f"LLM config updated: provider={body.provider}, model={body.model}")
+            return JSONResponse({"ok": True})
+        except Exception as e:
+            logger.error(f"Failed to update LLM config: {e}")
+            return JSONResponse({"error": str(e)}, status_code=500)
 
     return router
 
