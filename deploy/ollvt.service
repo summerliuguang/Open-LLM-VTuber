@@ -1,0 +1,14 @@
+[Unit]
+Description=Open-LLM-VTuber - Live2D 语音对话伴侣
+After=network.target
+
+[Service]
+Type=simple
+User=liuguang
+WorkingDirectory=/home/liuguang/web-projects/Open-LLM-VTuber
+ExecStart=/home/liuguang/web-projects/Open-LLM-VTuber/.venv/bin/python run_server.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
